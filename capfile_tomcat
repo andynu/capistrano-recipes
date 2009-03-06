@@ -1,0 +1,122 @@
+#!/usr/bin/ruby
+
+load 'deploy'
+
+# DEPLOYMENT SCHEME
+set :scm, :none
+set :deploy_via, :copy
+set :repository do 
+  fetch(:deploy_from)
+end
+default_run_options[:pty] = true
+
+# FOLDERS
+set :application, "my-webapp"
+#set :tomcat_home, "/usr/share/tomcat6/"
+#set :tomcat_ctrl, "/etc/init.d/tomcat6"
+set :tomcat_home, "/usr/share/tomcat55/"
+set :tomcat_ctrl, "/etc/init.d/tomcat55"
+
+set :war, "/home/andy/webapp/my-webapp/target/my-webapp.war"
+
+# SERVERS
+role :webserver, "svn"
+
+# USER / SHELL
+set :user, "batch_user" # the user to run remote commands as
+set :use_sudo, false
+
+set :deploy_from do 
+  dir = "/tmp/prep_#{release_name}"
+  system("mkdir -p #{dir}")
+  dir
+end
+set :deploy_to do 
+  "/u/apps/#{application}"
+end
+
+#
+# simple interactions with the tomcat server
+#
+namespace :tomcat do
+
+  desc "start tomcat"
+  task :start do
+    sudo "#{tomcat_ctrl} start"
+  end
+
+  desc "stop tomcat"
+  task :stop do
+    sudo "#{tomcat_ctrl} stop"
+  end
+
+  desc "stop and start tomcat"
+  task :restart do
+    tomcat.stop
+    tomcat.start
+  end
+
+  desc "tail :tomcat_home/logs/*.log and logs/catalina.out"
+  task :tail do
+    stream "tail -f #{tomcat_home}/logs/*.log #{tomcat_home}/logs/catalina.out"
+  end
+
+end
+
+#
+# link the current/whatever.war into our webapps/whatever.war
+#
+after 'deploy:setup' do
+  cmd = "ln -s #{deploy_to}/current/`basename #{war}` #{tomcat_home}/webapps/`basename #{war}`"
+  puts cmd
+  sudo cmd
+end
+
+
+# collect up our war into the deploy_from folder
+before 'deploy:update_code' do
+  unless(war.nil?)
+    puts "get war"
+    system("cp #{war} #{deploy_from}")
+    puts system("ls -l #{deploy_from}")
+  end
+end
+
+# restart tomcat
+namespace :deploy do
+  task :restart do
+    tomcat.restart
+  end
+end
+
+
+#
+# Disable all the default tasks that
+# either don't apply, or I haven't made work.
+#
+namespace :deploy do
+  [ :upload, :cold, :start, :stop, :migrate, :migrations ].each do |default_task|
+    desc "[internal] disabled"
+    task default_task do
+      # disabled
+    end
+  end
+
+  namespace :web do
+    [ :disable, :enable ].each do |default_task|
+      desc "[internal] disabled"
+      task default_task do
+        # disabled
+      end
+    end
+  end
+
+  namespace :pending do
+    [ :default, :diff ].each do |default_task|
+      desc "[internal] disabled"
+      task default_task do
+        # disabled
+      end
+    end
+  end
+end

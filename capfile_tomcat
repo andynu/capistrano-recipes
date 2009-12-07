@@ -71,7 +71,7 @@ end
 # link the current/whatever.war into our webapps/whatever.war
 #
 after 'deploy:setup' do
-  cmd = "ln -s #{deploy_to}/current/`basename #{war}` #{tomcat_home}/webapps/`basename #{war}`"
+  cmd = "ln -sf #{deploy_to}/current/`basename #{war}` #{tomcat_home}/webapps/`basename #{war}`"
   puts cmd
   sudo cmd
 end
